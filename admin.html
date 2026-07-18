@@ -232,9 +232,9 @@
   <div class="main">
     <div class="stats">
       <div class="stat"><div class="stat-n" id="statTotal">0</div><div class="stat-l">Leads Pulled</div></div>
-      <div class="stat"><div class="stat-n" id="statPhone">0</div><div class="stat-l">With Phone</div></div>
-      <div class="stat"><div class="stat-n" id="statValue">—</div><div class="stat-l">Avg Est. Value</div></div>
-      <div class="stat"><div class="stat-n" id="statEquity">—</div><div class="stat-l">Avg Equity %</div></div>
+      <div class="stat"><div class="stat-n" id="statAbsentee">0</div><div class="stat-l">Absentee Owners</div></div>
+      <div class="stat"><div class="stat-n" id="statOwner">0</div><div class="stat-l">Owner-Occupied</div></div>
+      <div class="stat"><div class="stat-n" id="statReady">CSV</div><div class="stat-l">Skip-Trace Ready</div></div>
     </div>
 
     <div class="table-wrap">
@@ -243,19 +243,21 @@
           <tr>
             <th>#</th>
             <th>Type</th>
-            <th>Owner Name</th>
             <th>Address</th>
             <th>City</th>
             <th>State</th>
             <th>Zip</th>
-            <th>Est. Value</th>
-            <th>Equity %</th>
-            <th>Bedrooms</th>
+            <th>Occupancy</th>
+            <th>Prop Type</th>
+            <th>Yr Built</th>
+            <th>Condition</th>
+            <th>Beds</th>
+            <th>Baths</th>
             <th>Sq Ft</th>
           </tr>
         </thead>
         <tbody id="resultsBody">
-          <tr><td colspan="11">
+          <tr><td colspan="13">
             <div class="empty-state">
               <div class="icon">📋</div>
               <h3>No leads pulled yet</h3>
@@ -352,45 +354,26 @@
 
     return props.slice(0, max).map(p => {
       const addr = p.address || {};
-      const avm = p.avm || {};
-      const assessment = p.assessment || {};
       const building = p.building || {};
-      const owner = p.owner || {};
       const summary = p.summary || {};
-      const mort = p.mortgage || {};
+      const construction = building.construction || {};
 
-      // Try every known ATTOM owner name field
-      const ownerName =
-        owner.owner1?.fullname ||
-        owner.owner1?.corpname ||
-        owner.corporateName ||
-        summary.absenteeInd ||
-        addr.owner1full ||
-        addr.ownersfullname ||
-        '—';
-
-      const estValue =
-        avm.amount?.value ||
-        avm.estimatedvalue ||
-        assessment.market?.mktttlvalue ||
-        assessment.assessed?.assdttlvalue ||
-        null;
-
-      const loanBal = mort.amount || mort.firstmtgamt || null;
-      const equity = estValue && loanBal ? Math.round(((estValue - loanBal) / estValue) * 100) : null;
+      const occupancy = summary.absenteeInd || '—';
+      const isAbsentee = occupancy.toLowerCase().includes('absentee');
 
       return {
         type: type,
-        owner: ownerName,
         address: addr.line1 || '—',
         city: addr.locality || '—',
         state: addr.countrySubd || state,
         zip: addr.postal1 || zip || '—',
-        estValue: estValue,
-        equity: equity,
-        beds: building.rooms?.beds || building.bedrooms || '—',
-        sqft: building.size?.universalsize || building.grosssize || '—',
-        mailingAddr: owner.mailingaddressoneline || owner.absenteeOwnerAddress || ''
+        occupancy: isAbsentee ? 'Absentee' : 'Owner-Occupied',
+        proptype: summary.proptype || summary.propLandUse || '—',
+        yearbuilt: summary.yearbuilt || '—',
+        condition: construction.condition || '—',
+        beds: building.rooms?.beds || '—',
+        baths: building.rooms?.bathstotal || '—',
+        sqft: building.size?.universalsize || building.size?.livingsize || '—'
       };
     });
   }
@@ -414,14 +397,16 @@
       <tr>
         <td style="color:var(--meta)">${i + 1}</td>
         <td><span class="badge ${typeColors[l.type]}">${typeLabels[l.type]}</span></td>
-        <td style="font-weight:600">${l.owner}</td>
         <td>${l.address}</td>
         <td>${l.city}</td>
         <td>${l.state}</td>
         <td>${l.zip}</td>
-        <td>${l.estValue ? '$' + Number(l.estValue).toLocaleString() : '—'}</td>
-        <td>${l.equity !== null ? l.equity + '%' : '—'}</td>
+        <td><span class="badge ${l.occupancy === 'Absentee' ? 'badge-blue' : 'badge-green'}">${l.occupancy}</span></td>
+        <td style="font-size:0.75rem;color:var(--meta)">${l.proptype}</td>
+        <td>${l.yearbuilt}</td>
+        <td>${l.condition}</td>
         <td>${l.beds}</td>
+        <td>${l.baths}</td>
         <td>${l.sqft !== '—' ? Number(l.sqft).toLocaleString() : '—'}</td>
       </tr>
     `).join('');
@@ -429,7 +414,7 @@
 
   function renderEmpty(msg) {
     document.getElementById('resultsBody').innerHTML = `
-      <tr><td colspan="11">
+      <tr><td colspan="13">
         <div class="empty-state">
           <div class="icon">⚠️</div>
           <h3>${msg}</h3>
@@ -440,24 +425,9 @@
 
   function updateStats(leads) {
     document.getElementById('statTotal').textContent = leads.length;
-    const withPhone = leads.filter(l => l.phone && l.phone !== '—').length;
-    document.getElementById('statPhone').textContent = withPhone;
-
-    const values = leads.filter(l => l.estValue).map(l => l.estValue);
-    if (values.length) {
-      const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
-      document.getElementById('statValue').textContent = '$' + avg.toLocaleString();
-    } else {
-      document.getElementById('statValue').textContent = '—';
-    }
-
-    const equities = leads.filter(l => l.equity !== null).map(l => l.equity);
-    if (equities.length) {
-      const avg = Math.round(equities.reduce((a, b) => a + b, 0) / equities.length);
-      document.getElementById('statEquity').textContent = avg + '%';
-    } else {
-      document.getElementById('statEquity').textContent = '—';
-    }
+    document.getElementById('statAbsentee').textContent = leads.filter(l => l.occupancy === 'Absentee').length;
+    document.getElementById('statOwner').textContent = leads.filter(l => l.occupancy === 'Owner-Occupied').length;
+    document.getElementById('statReady').textContent = leads.length + ' ✓';
   }
 
   function exportCSV() {
@@ -467,20 +437,22 @@
     const custPkg = document.getElementById('custPkg').value || 'leads';
     const date = new Date().toISOString().slice(0, 10);
 
-    const headers = ['#', 'Lead Type', 'Owner Name', 'Address', 'City', 'State', 'Zip', 'Est Value', 'Equity %', 'Bedrooms', 'Sq Ft'];
+    const headers = ['#', 'Lead Type', 'Address', 'City', 'State', 'Zip', 'Occupancy', 'Property Type', 'Year Built', 'Condition', 'Beds', 'Baths', 'Sq Ft'];
     const typeLabels = { preforeclosure: 'Pre-Foreclosure', highequity: 'High Equity', taxdelinquent: 'Tax Delinquent', absentee: 'Absentee Owner' };
 
     const rows = pulledLeads.map((l, i) => [
       i + 1,
-      typeLabels[l.type],
-      l.owner,
+      typeLabels[l.type] || l.type,
       l.address,
       l.city,
       l.state,
       l.zip,
-      l.estValue ? l.estValue : '',
-      l.equity !== null ? l.equity : '',
+      l.occupancy,
+      l.proptype,
+      l.yearbuilt,
+      l.condition,
       l.beds,
+      l.baths,
       l.sqft !== '—' ? l.sqft : ''
     ]);
 
