@@ -271,6 +271,7 @@
 <script>
   const API_KEY = 'f4e66f79b57ce4d96ba5d98573e761fc';
   const BASE = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0';
+  const PROXY = 'https://corsproxy.io/?url=';
 
   let pulledLeads = [];
 
@@ -347,7 +348,7 @@
       params.set('absentee', '1');
     }
 
-    const url = `${endpoint}?${params.toString()}`;
+    const url = `${PROXY}${encodeURIComponent(`${endpoint}?${params.toString()}`)}`;
     const resp = await fetch(url, { headers });
 
     if (!resp.ok) {
