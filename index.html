@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeadPuller — Mortgage Lead Engine</title>
+<style>
+  :root {
+    --bg: #0D1B2A;
+    --surface: #122236;
+    --card: #172840;
+    --border: #1E3550;
+    --text: #E8EBF0;
+    --meta: #7A8FA0;
+    --accent: #C8922A;
+    --gold: #F0B429;
+    --green: #22C55E;
+    --red: #EF4444;
+    --blue: #3B82F6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+    min-height: 100vh;
+  }
+
+  /* NAV */
+  .nav {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    height: 58px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  .nav-brand {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: -0.02em;
+  }
+
+  .nav-brand span { color: var(--text); }
+
+  .nav-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--meta);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--meta);
+  }
+  .status-dot.connected { background: var(--green); }
+
+  /* LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    min-height: calc(100vh - 58px);
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    overflow-y: auto;
+  }
+
+  .section-label {
+    font-size: 0.65rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--meta);
+    margin-bottom: 10px;
+    font-weight: 600;
+  }
+
+  .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+
+  .field label {
+    font-size: 0.75rem;
+    color: var(--meta);
+    font-weight: 600;
+  }
+
+  .field input, .field select {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 0.85rem;
+    width: 100%;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+
+  .field input::placeholder { color: var(--meta); }
+
+  .field select option { background: var(--card); }
+
+  .lead-types { display: flex; flex-direction: column; gap: 8px; }
+
+  .lead-type-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+    font-size: 0.82rem;
+    text-align: left;
+  }
+
+  .lead-type-btn:hover { border-color: var(--accent); }
+  .lead-type-btn.active { border-color: var(--accent); background: rgba(200,146,42,0.1); }
+
+  .lead-type-btn .icon {
+    width: 32px; height: 32px;
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1rem;
+    flex-shrink: 0;
+  }
+
+  .lead-type-btn .icon.red { background: rgba(239,68,68,0.15); }
+  .lead-type-btn .icon.blue { background: rgba(59,130,246,0.15); }
+  .lead-type-btn .icon.green { background: rgba(34,197,94,0.15); }
+  .lead-type-btn .icon.gold { background: rgba(240,180,41,0.15); }
+
+  .lead-type-btn .info strong { display: block; font-size: 0.82rem; }
+  .lead-type-btn .info small { color: var(--meta); font-size: 0.7rem; }
+
+  .pull-btn {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s;
+    letter-spacing: 0.02em;
+  }
+
+  .pull-btn:hover { opacity: 0.88; }
+  .pull-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* MAIN */
+  .main { padding: 28px; overflow-y: auto; }
+
+  /* STATS ROW */
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 18px;
+  }
+
+  .stat-label { font-size: 0.7rem; color: var(--meta); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 6px; }
+  .stat-value { font-size: 1.6rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+  .stat-value.gold { color: var(--gold); }
+  .stat-value.green { color: var(--green); }
+
+  /* RESULTS */
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .results-title { font-size: 0.95rem; font-weight: 700; }
+  .results-meta { font-size: 0.75rem; color: var(--meta); }
+
+  .action-btns { display: flex; gap: 8px; }
+
+  .btn-sm {
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.2s;
+  }
+
+  .btn-export {
+    background: var(--green);
+    color: #fff;
+  }
+
+  .btn-clear {
+    background: var(--card);
+    color: var(--meta);
+    border: 1px solid var(--border);
+  }
+
+  .btn-sm:hover { opacity: 0.85; }
+  .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* TABLE */
+  .table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+  }
+
+  thead {
+    background: var(--card);
+    border-bottom: 1px solid var(--border);
+  }
+
+  th {
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--meta);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .badge-red { background: rgba(239,68,68,0.15); color: #EF4444; }
+  .badge-blue { background: rgba(59,130,246,0.15); color: #3B82F6; }
+  .badge-green { background: rgba(34,197,94,0.15); color: #22C55E; }
+  .badge-gold { background: rgba(240,180,41,0.15); color: #F0B429; }
+
+  /* EMPTY STATE */
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--meta);
+  }
+
+  .empty-icon { font-size: 3rem; margin-bottom: 16px; }
+  .empty-title { font-size: 1rem; font-weight: 600; color: var(--text); margin-bottom: 8px; }
+  .empty-sub { font-size: 0.82rem; line-height: 1.6; }
+
+  /* LOADER */
+  .loader-wrap {
+    text-align: center;
+    padding: 60px 20px;
+  }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loader-text { color: var(--meta); font-size: 0.85rem; }
+
+  /* ERROR */
+  .error-box {
+    background: rgba(239,68,68,0.1);
+    border: 1px solid rgba(239,68,68,0.3);
+    border-radius: 8px;
+    padding: 14px 18px;
+    color: #EF4444;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  /* API KEY NOTICE */
+  .api-notice {
+    background: rgba(200,146,42,0.1);
+    border: 1px solid rgba(200,146,42,0.3);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 0.78rem;
+    color: var(--gold);
+    line-height: 1.5;
+  }
+
+  .api-notice a { color: var(--gold); }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-brand">Lead<span>Puller</span> <span style="color:var(--meta);font-size:0.7rem;font-weight:400;">by John O. Emmanuel</span></div>
+  <div class="nav-status">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">Not connected</span>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div>
+      <div class="section-label">API Key</div>
+      <div class="field">
+        <label>ATTOM API Key</label>
+        <input type="password" id="apiKey" placeholder="Paste your ATTOM API key" autocomplete="off">
+      </div>
+      <div class="api-notice">
+        Get your free key at <a href="https://cloud.attomdata.com" target="_blank">cloud.attomdata.com</a> → 30-day free trial
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Location</div>
+      <div class="field">
+        <label>State</label>
+        <select id="stateSelect">
+          <option value="TX">Texas</option>
+          <option value="FL">Florida</option>
+          <option value="CA">California</option>
+          <option value="NY">New York</option>
+          <option value="IL">Illinois</option>
+          <option value="GA">Georgia</option>
+          <option value="AZ">Arizona</option>
+          <option value="NV">Nevada</option>
+          <option value="OH">Ohio</option>
+          <option value="NC">North Carolina</option>
+          <option value="PA">Pennsylvania</option>
+          <option value="MI">Michigan</option>
+          <option value="CO">Colorado</option>
+          <option value="WA">Washington</option>
+          <option value="TN">Tennessee</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Zip Code(s)</label>
+        <input type="text" id="zipCode" placeholder="e.g. 75201, 75202" value="75201">
+      </div>
+      <div class="field">
+        <label>Max Results</label>
+        <select id="maxResults">
+          <option value="10" selected>10 leads (sample)</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Lead Type</div>
+      <div class="lead-types">
+        <button class="lead-type-btn active" data-type="preforeclosure" onclick="selectLeadType(this)">
+          <div class="icon red">🚨</div>
+          <div class="info">
+            <strong>Pre-Foreclosure</strong>
+            <small>Owners behind on mortgage</small>
+          </div>
+        </button>
+        <button class="lead-type-btn" data-type="highequity" onclick="selectLeadType(this)">
+          <div class="icon green">💰</div>
+          <div class="info">
+            <strong>High Equity</strong>
+            <small>Cash-out refi candidates</small>
+          </div>
+        </button>
+        <button class="lead-type-btn" data-type="taxdelinquent" onclick="selectLeadType(this)">
+          <div class="icon gold">⚠️</div>
+          <div class="info">
+            <strong>Tax Delinquent</strong>
+            <small>Behind on property taxes</small>
+          </div>
+        </button>
+        <button class="lead-type-btn" data-type="absentee" onclick="selectLeadType(this)">
+          <div class="icon blue">🏘️</div>
+          <div class="info">
+            <strong>Absentee Owners</strong>
+            <small>Landlords / renters living there</small>
+          </div>
+        </button>
+      </div>
+    </div>
+
+    <button class="pull-btn" id="pullBtn" onclick="pullLeads()">
+      Pull Leads →
+    </button>
+
+  </aside>
+
+  <!-- MAIN CONTENT -->
+  <main class="main">
+
+    <!-- STATS -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-label">Total Pulled</div>
+        <div class="stat-value gold" id="statTotal">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">With Phone</div>
+        <div class="stat-value green" id="statPhone">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">With Email</div>
+        <div class="stat-value" id="statEmail">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Est. List Value</div>
+        <div class="stat-value gold" id="statValue">$0</div>
+      </div>
+    </div>
+
+    <!-- ERROR BOX -->
+    <div class="error-box" id="errorBox"></div>
+
+    <!-- RESULTS -->
+    <div class="results-header">
+      <div>
+        <div class="results-title">Lead Results</div>
+        <div class="results-meta" id="resultsMeta">No leads pulled yet — configure filters and click Pull Leads</div>
+      </div>
+      <div class="action-btns">
+        <button class="btn-sm btn-clear" onclick="clearResults()">Clear</button>
+        <button class="btn-sm btn-export" id="exportBtn" onclick="exportCSV()" disabled>Export CSV</button>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div id="tableContent">
+        <div class="empty-state">
+          <div class="empty-icon">🎯</div>
+          <div class="empty-title">No leads yet</div>
+          <div class="empty-sub">Enter your ATTOM API key, select a zip code<br>and lead type, then click Pull Leads.</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  let leads = [];
+  let selectedLeadType = 'preforeclosure';
+
+  // Load saved API key
+  window.addEventListener('load', () => {
+    const saved = localStorage.getItem('attom_api_key');
+    if (saved) {
+      document.getElementById('apiKey').value = saved;
+      setStatus(true, 'API key loaded');
+    }
+  });
+
+  // Save API key on input
+  document.getElementById('apiKey').addEventListener('input', function() {
+    if (this.value.length > 10) {
+      localStorage.setItem('attom_api_key', this.value);
+      setStatus(true, 'Connected');
+    } else {
+      setStatus(false, 'Not connected');
+    }
+  });
+
+  function setStatus(connected, text) {
+    const dot = document.getElementById('statusDot');
+    const txt = document.getElementById('statusText');
+    dot.className = 'status-dot' + (connected ? ' connected' : '');
+    txt.textContent = text;
+  }
+
+  function selectLeadType(btn) {
+    document.querySelectorAll('.lead-type-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedLeadType = btn.dataset.type;
+  }
+
+  async function pullLeads() {
+    const apiKey = document.getElementById('apiKey').value.trim();
+    const zip = document.getElementById('zipCode').value.trim().split(',')[0].trim();
+    const maxResults = parseInt(document.getElementById('maxResults').value);
+
+    if (!apiKey) {
+      showError('Please enter your ATTOM API key first.');
+      return;
+    }
+    if (!zip) {
+      showError('Please enter a zip code.');
+      return;
+    }
+
+    hideError();
+    showLoader();
+    document.getElementById('pullBtn').disabled = true;
+
+    try {
+      let data;
+      const headers = {
+        'apikey': apiKey,
+        'Accept': 'application/json'
+      };
+
+      const baseUrl = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0';
+
+      if (selectedLeadType === 'preforeclosure') {
+        const res = await fetch(
+          `${baseUrl}/allevents/detail?postalcode=${zip}&eventtype=LisPendens&pagesize=${maxResults}`,
+          { headers }
+        );
+        data = await res.json();
+        leads = parseEvents(data, 'Pre-Foreclosure');
+
+      } else if (selectedLeadType === 'highequity') {
+        const res = await fetch(
+          `${baseUrl}/avm/detail?postalcode=${zip}&minequitypercent=40&pagesize=${maxResults}`,
+          { headers }
+        );
+        data = await res.json();
+        leads = parseAVM(data, 'High Equity');
+
+      } else if (selectedLeadType === 'taxdelinquent') {
+        const res = await fetch(
+          `${baseUrl}/allevents/detail?postalcode=${zip}&eventtype=TaxLien&pagesize=${maxResults}`,
+          { headers }
+        );
+        data = await res.json();
+        leads = parseEvents(data, 'Tax Delinquent');
+
+      } else if (selectedLeadType === 'absentee') {
+        const res = await fetch(
+          `${baseUrl}/property/detail?postalcode=${zip}&owneroccupied=N&pagesize=${maxResults}`,
+          { headers }
+        );
+        data = await res.json();
+        leads = parseProperty(data, 'Absentee Owner');
+      }
+
+      if (leads.length === 0) {
+        // Try fallback endpoint
+        const res = await fetch(
+          `${baseUrl}/property/snapshot?postalcode=${zip}&pagesize=${maxResults}`,
+          { headers }
+        );
+        data = await res.json();
+        leads = parseSnapshot(data, getLeadTypeLabel(selectedLeadType));
+      }
+
+      renderTable(leads);
+      updateStats(leads);
+
+    } catch (err) {
+      showError('Connection error: ' + err.message + '. Check your API key and try again.');
+      showEmpty();
+    }
+
+    document.getElementById('pullBtn').disabled = false;
+  }
+
+  function getLeadTypeLabel(type) {
+    const map = {
+      preforeclosure: 'Pre-Foreclosure',
+      highequity: 'High Equity',
+      taxdelinquent: 'Tax Delinquent',
+      absentee: 'Absentee Owner'
+    };
+    return map[type] || type;
+  }
+
+  function parseEvents(data, type) {
+    if (!data || !data.property) return [];
+    return data.property.map(p => ({
+      type,
+      owner: p.identifier?.obPropId ? 'Owner on Record' : '—',
+      address: [p.address?.line1, p.address?.locality, p.address?.countrySubd].filter(Boolean).join(', '),
+      zip: p.address?.postal1 || '—',
+      value: p.avm?.amount?.value ? '$' + Number(p.avm.amount.value).toLocaleString() : '—',
+      equity: p.avm?.amount?.valuerange?.high ? '$' + Number(p.avm.amount.valuerange.high).toLocaleString() : '—',
+      phone: '—',
+      email: '—',
+      status: type
+    }));
+  }
+
+  function parseAVM(data, type) {
+    if (!data || !data.property) return [];
+    return data.property.map(p => ({
+      type,
+      owner: p.owner?.owner1?.lastName ? p.owner.owner1.lastName + ', ' + (p.owner.owner1.firstName || '') : 'Owner on Record',
+      address: [p.address?.line1, p.address?.locality, p.address?.countrySubd].filter(Boolean).join(', '),
+      zip: p.address?.postal1 || '—',
+      value: p.avm?.amount?.value ? '$' + Number(p.avm.amount.value).toLocaleString() : '—',
+      equity: p.avm?.amount?.valuerange?.high ? '$' + Number(p.avm.amount.valuerange.high).toLocaleString() : '—',
+      phone: '—',
+      email: '—',
+      status: type
+    }));
+  }
+
+  function parseProperty(data, type) {
+    if (!data || !data.property) return [];
+    return data.property.map(p => ({
+      type,
+      owner: p.owner?.owner1?.lastName ? p.owner.owner1.lastName + ', ' + (p.owner.owner1.firstName || '') : 'Owner on Record',
+      address: [p.address?.line1, p.address?.locality, p.address?.countrySubd].filter(Boolean).join(', '),
+      zip: p.address?.postal1 || '—',
+      value: p.avm?.amount?.value ? '$' + Number(p.avm.amount.value).toLocaleString() : '—',
+      equity: '—',
+      phone: '—',
+      email: '—',
+      status: type
+    }));
+  }
+
+  function parseSnapshot(data, type) {
+    if (!data || !data.property) return [];
+    return data.property.map(p => ({
+      type,
+      owner: p.owner?.owner1?.lastName ? p.owner.owner1.lastName + ', ' + (p.owner.owner1.firstName || '') : 'Owner on Record',
+      address: [p.address?.line1, p.address?.locality, p.address?.countrySubd].filter(Boolean).join(', '),
+      zip: p.address?.postal1 || '—',
+      value: p.avm?.amount?.value ? '$' + Number(p.avm.amount.value).toLocaleString() : '—',
+      equity: '—',
+      phone: '—',
+      email: '—',
+      status: type
+    }));
+  }
+
+  function renderTable(data) {
+    if (!data || data.length === 0) {
+      showEmpty();
+      document.getElementById('resultsMeta').textContent = 'No leads found for this filter. Try a different zip code or lead type.';
+      document.getElementById('exportBtn').disabled = true;
+      return;
+    }
+
+    const typeBadge = {
+      'Pre-Foreclosure': 'badge-red',
+      'High Equity': 'badge-green',
+      'Tax Delinquent': 'badge-gold',
+      'Absentee Owner': 'badge-blue'
+    };
+
+    let rows = data.map(l => `
+      <tr>
+        <td><span class="badge ${typeBadge[l.status] || 'badge-blue'}">${l.status}</span></td>
+        <td>${l.owner}</td>
+        <td>${l.address}</td>
+        <td>${l.zip}</td>
+        <td>${l.value}</td>
+        <td>${l.equity}</td>
+        <td style="color:var(--meta)">${l.phone}</td>
+        <td style="color:var(--meta)">${l.email}</td>
+      </tr>
+    `).join('');
+
+    document.getElementById('tableContent').innerHTML = `
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Owner</th>
+              <th>Address</th>
+              <th>Zip</th>
+              <th>Est. Value</th>
+              <th>Equity</th>
+              <th>Phone</th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    `;
+
+    document.getElementById('resultsMeta').textContent = `${data.length} leads pulled · Phone/Email requires skip tracing`;
+    document.getElementById('exportBtn').disabled = false;
+  }
+
+  function updateStats(data) {
+    document.getElementById('statTotal').textContent = data.length;
+    document.getElementById('statPhone').textContent = data.filter(l => l.phone !== '—').length;
+    document.getElementById('statEmail').textContent = data.filter(l => l.email !== '—').length;
+    const val = Math.ceil(data.length / 100) * 150;
+    document.getElementById('statValue').textContent = '$' + val.toLocaleString();
+  }
+
+  function exportCSV() {
+    if (!leads.length) return;
+    const headers = ['Type', 'Owner', 'Address', 'Zip', 'Est Value', 'Equity', 'Phone', 'Email'];
+    const rows = leads.map(l => [l.type, l.owner, l.address, l.zip, l.value, l.equity, l.phone, l.email]);
+    const csv = [headers, ...rows].map(r => r.map(c => `"${c}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `leads-${selectedLeadType}-${document.getElementById('zipCode').value}-${Date.now()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function clearResults() {
+    leads = [];
+    showEmpty();
+    updateStats([]);
+    document.getElementById('resultsMeta').textContent = 'No leads pulled yet — configure filters and click Pull Leads';
+    document.getElementById('exportBtn').disabled = true;
+    hideError();
+  }
+
+  function showLoader() {
+    document.getElementById('tableContent').innerHTML = `
+      <div class="loader-wrap">
+        <div class="spinner"></div>
+        <div class="loader-text">Pulling leads from ATTOM database...</div>
+      </div>
+    `;
+  }
+
+  function showEmpty() {
+    document.getElementById('tableContent').innerHTML = `
+      <div class="empty-state">
+        <div class="empty-icon">🎯</div>
+        <div class="empty-title">No leads yet</div>
+        <div class="empty-sub">Enter your ATTOM API key, select a zip code<br>and lead type, then click Pull Leads.</div>
+      </div>
+    `;
+  }
+
+  function showError(msg) {
+    const box = document.getElementById('errorBox');
+    box.textContent = '⚠️ ' + msg;
+    box.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('errorBox').style.display = 'none';
+  }
+</script>
+
+</body>
+</html>
