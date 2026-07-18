@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LeadPuller Admin — Pull Leads</title>
+<style>
+  :root {
+    --bg: #0A0F1A;
+    --surface: #111827;
+    --card: #1A2333;
+    --border: #1F2E42;
+    --text: #E8EBF0;
+    --meta: #6B7FA0;
+    --accent: #C8922A;
+    --gold: #F0B429;
+    --green: #22C55E;
+    --red: #EF4444;
+    --blue: #3B82F6;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; font-size: 14px; line-height: 1.5; }
+
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .brand { font-weight: 800; font-size: 1.1rem; color: var(--gold); }
+  .admin-badge { background: rgba(239,68,68,0.15); color: var(--red); padding: 3px 10px; border-radius: 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+
+  .layout { display: grid; grid-template-columns: 280px 1fr; min-height: calc(100vh - 53px); }
+
+  /* SIDEBAR */
+  .sidebar { background: var(--surface); border-right: 1px solid var(--border); padding: 24px 18px; display: flex; flex-direction: column; gap: 14px; }
+
+  .sidebar h3 { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--meta); margin-bottom: 4px; }
+
+  .field { display: flex; flex-direction: column; gap: 5px; }
+  .field label { font-size: 0.72rem; color: var(--meta); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .field select, .field input {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 11px;
+    color: var(--text);
+    font-size: 0.82rem;
+    outline: none;
+    width: 100%;
+    font-family: inherit;
+    transition: border-color 0.2s;
+  }
+  .field select:focus, .field input:focus { border-color: var(--accent); }
+  .field select option { background: var(--card); }
+
+  .divider { height: 1px; background: var(--border); }
+
+  .pull-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 11px;
+    font-size: 0.9rem;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    transition: opacity 0.2s;
+    letter-spacing: 0.01em;
+  }
+  .pull-btn:hover:not(:disabled) { opacity: 0.88; }
+  .pull-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .export-btn {
+    background: var(--card);
+    color: var(--green);
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 7px;
+    padding: 10px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    cursor: pointer;
+    width: 100%;
+    transition: background 0.2s;
+    display: none;
+  }
+  .export-btn:hover { background: rgba(34,197,94,0.08); }
+
+  .status-box {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px 12px;
+    font-size: 0.75rem;
+    color: var(--meta);
+    min-height: 40px;
+    line-height: 1.5;
+  }
+  .status-box.ok { color: var(--green); border-color: rgba(34,197,94,0.25); }
+  .status-box.err { color: var(--red); border-color: rgba(239,68,68,0.25); }
+  .status-box.loading { color: var(--gold); border-color: rgba(240,180,41,0.25); }
+
+  /* ORDER INFO */
+  .order-field { display: flex; flex-direction: column; gap: 4px; }
+  .order-field label { font-size: 0.68rem; color: var(--meta); text-transform: uppercase; letter-spacing: 0.06em; }
+  .order-field input { background: var(--card); border: 1px solid var(--border); border-radius: 5px; padding: 7px 10px; color: var(--text); font-size: 0.8rem; outline: none; width: 100%; }
+  .order-field input:focus { border-color: var(--accent); }
+
+  /* MAIN AREA */
+  .main { padding: 24px; display: flex; flex-direction: column; gap: 16px; overflow: auto; }
+
+  /* STATS */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .stat { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; }
+  .stat-n { font-size: 1.5rem; font-weight: 800; color: var(--gold); font-variant-numeric: tabular-nums; line-height: 1; }
+  .stat-l { font-size: 0.65rem; color: var(--meta); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 3px; }
+
+  /* TABLE */
+  .table-wrap { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: auto; }
+  .results-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; min-width: 700px; }
+  .results-table th { padding: 10px 12px; text-align: left; font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--meta); background: var(--surface); border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .results-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .results-table tr:last-child td { border-bottom: none; }
+  .results-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .badge { display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-red { background: rgba(239,68,68,0.12); color: var(--red); }
+  .badge-green { background: rgba(34,197,94,0.12); color: var(--green); }
+  .badge-gold { background: rgba(240,180,41,0.12); color: var(--gold); }
+  .badge-blue { background: rgba(59,130,246,0.12); color: var(--blue); }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--meta); }
+  .empty-state .icon { font-size: 2.5rem; margin-bottom: 12px; }
+  .empty-state h3 { font-size: 0.95rem; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  .empty-state p { font-size: 0.8rem; }
+
+  @media (max-width: 768px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { border-right: none; border-bottom: 1px solid var(--border); }
+    .stats { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">LeadPuller</div>
+  <div class="admin-badge">🔒 Admin Only</div>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <h3>Order Details</h3>
+    <div class="order-field">
+      <label>Customer Name</label>
+      <input type="text" id="custName" placeholder="Who ordered?">
+    </div>
+    <div class="order-field">
+      <label>Package</label>
+      <input type="text" id="custPkg" placeholder="e.g. Growth — 100 leads">
+    </div>
+
+    <div class="divider"></div>
+    <h3>Lead Filters</h3>
+
+    <div class="field">
+      <label>Lead Type</label>
+      <select id="leadType">
+        <option value="preforeclosure">Pre-Foreclosure</option>
+        <option value="highequity">High Equity (40%+)</option>
+        <option value="taxdelinquent">Tax Delinquent</option>
+        <option value="absentee">Absentee Owners</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>State</label>
+      <select id="state">
+        <option value="TX">Texas</option>
+        <option value="FL">Florida</option>
+        <option value="CA">California</option>
+        <option value="NY">New York</option>
+        <option value="IL">Illinois</option>
+        <option value="GA">Georgia</option>
+        <option value="AZ">Arizona</option>
+        <option value="NV">Nevada</option>
+        <option value="OH">Ohio</option>
+        <option value="NC">North Carolina</option>
+        <option value="PA">Pennsylvania</option>
+        <option value="MI">Michigan</option>
+        <option value="CO">Colorado</option>
+        <option value="WA">Washington</option>
+        <option value="TN">Tennessee</option>
+        <option value="IN">Indiana</option>
+        <option value="MO">Missouri</option>
+        <option value="WI">Wisconsin</option>
+        <option value="MN">Minnesota</option>
+        <option value="SC">South Carolina</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Zip Code</label>
+      <input type="text" id="zipCode" placeholder="e.g. 75201">
+    </div>
+
+    <div class="field">
+      <label>Max Results</label>
+      <select id="maxResults">
+        <option value="10">10</option>
+        <option value="25">25</option>
+        <option value="50" selected>50</option>
+        <option value="100">100</option>
+        <option value="250">250</option>
+        <option value="500">500</option>
+      </select>
+    </div>
+
+    <div class="divider"></div>
+
+    <button class="pull-btn" id="pullBtn" onclick="pullLeads()">Pull Leads →</button>
+    <button class="export-btn" id="exportBtn" onclick="exportCSV()">⬇ Download CSV</button>
+    <div class="status-box" id="statusBox">Ready. Select filters and pull.</div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="stats">
+      <div class="stat"><div class="stat-n" id="statTotal">0</div><div class="stat-l">Leads Pulled</div></div>
+      <div class="stat"><div class="stat-n" id="statPhone">0</div><div class="stat-l">With Phone</div></div>
+      <div class="stat"><div class="stat-n" id="statValue">—</div><div class="stat-l">Avg Est. Value</div></div>
+      <div class="stat"><div class="stat-n" id="statEquity">—</div><div class="stat-l">Avg Equity %</div></div>
+    </div>
+
+    <div class="table-wrap">
+      <table class="results-table" id="resultsTable">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Type</th>
+            <th>Owner Name</th>
+            <th>Address</th>
+            <th>City</th>
+            <th>State</th>
+            <th>Zip</th>
+            <th>Est. Value</th>
+            <th>Equity %</th>
+            <th>Bedrooms</th>
+            <th>Sq Ft</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody">
+          <tr><td colspan="11">
+            <div class="empty-state">
+              <div class="icon">📋</div>
+              <h3>No leads pulled yet</h3>
+              <p>Select filters in the sidebar and click "Pull Leads"</p>
+            </div>
+          </td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_KEY = 'f4e66f79b57ce4d96ba5d98573e761fc';
+  const BASE = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0';
+
+  let pulledLeads = [];
+
+  async function pullLeads() {
+    const leadType = document.getElementById('leadType').value;
+    const state = document.getElementById('state').value;
+    const zip = document.getElementById('zipCode').value.trim();
+    const maxResults = parseInt(document.getElementById('maxResults').value);
+
+    const btn = document.getElementById('pullBtn');
+    const statusBox = document.getElementById('statusBox');
+    const exportBtn = document.getElementById('exportBtn');
+
+    btn.disabled = true;
+    btn.textContent = 'Pulling...';
+    statusBox.className = 'status-box loading';
+    statusBox.textContent = 'Connecting to ATTOM data...';
+    pulledLeads = [];
+    exportBtn.style.display = 'none';
+
+    try {
+      const results = await fetchLeads(leadType, state, zip, maxResults);
+      pulledLeads = results;
+
+      if (results.length === 0) {
+        statusBox.className = 'status-box err';
+        statusBox.textContent = 'No results found. Try a different zip or state.';
+        renderEmpty('No results for these filters');
+      } else {
+        statusBox.className = 'status-box ok';
+        statusBox.textContent = `✓ ${results.length} leads pulled successfully.`;
+        renderTable(results);
+        updateStats(results);
+        exportBtn.style.display = 'block';
+      }
+    } catch (err) {
+      console.error(err);
+      statusBox.className = 'status-box err';
+      statusBox.textContent = `Error: ${err.message}`;
+      renderEmpty('API error — check console for details');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Pull Leads →';
+    }
+  }
+
+  async function fetchLeads(type, state, zip, max) {
+    const headers = { 'apikey': API_KEY, 'Accept': 'application/json' };
+    let endpoint = '';
+    let params = new URLSearchParams();
+
+    params.set('pagesize', String(Math.min(max, 100)));
+    params.set('page', '1');
+
+    if (zip) {
+      params.set('postalcode', zip);
+    } else {
+      params.set('state', state);
+    }
+
+    if (type === 'preforeclosure') {
+      endpoint = `${BASE}/allevents/detail`;
+      params.set('eventtypeid', '59');  // Lis Pendens
+    } else if (type === 'highequity') {
+      endpoint = `${BASE}/property/snapshot`;
+      params.set('mineqpct', '40');
+      params.set('ownocc', '1');
+    } else if (type === 'taxdelinquent') {
+      endpoint = `${BASE}/allevents/detail`;
+      params.set('eventtypeid', '118'); // Tax Lien
+    } else if (type === 'absentee') {
+      endpoint = `${BASE}/property/snapshot`;
+      params.set('ownocc', '0');
+      params.set('absentee', '1');
+    }
+
+    const url = `${endpoint}?${params.toString()}`;
+    const resp = await fetch(url, { headers });
+
+    if (!resp.ok) {
+      const text = await resp.text();
+      throw new Error(`ATTOM API ${resp.status}: ${text.slice(0, 200)}`);
+    }
+
+    const data = await resp.json();
+
+    // Handle both property and event response shapes
+    const props = data.property || data.event || [];
+    if (!Array.isArray(props)) throw new Error('Unexpected API response shape');
+
+    return props.slice(0, max).map(p => {
+      const addr = p.address || {};
+      const avm = p.avm || {};
+      const assessment = p.assessment || {};
+      const lot = p.lot || {};
+      const building = p.building || {};
+      const owner = p.owner || {};
+      const mort = p.mortgage || {};
+
+      const estValue = avm.amount?.value || assessment.assessed?.assdttlvalue || null;
+      const loanBal = mort.amount || null;
+      const equity = estValue && loanBal ? Math.round(((estValue - loanBal) / estValue) * 100) : null;
+
+      return {
+        type: type,
+        owner: owner.owner1?.fullname || addr.owner1full || '—',
+        address: addr.line1 || '—',
+        city: addr.locality || '—',
+        state: addr.countrySubd || state,
+        zip: addr.postal1 || zip || '—',
+        estValue: estValue,
+        equity: equity,
+        beds: building.rooms?.beds || '—',
+        sqft: building.size?.universalsize || '—'
+      };
+    });
+  }
+
+  function renderTable(leads) {
+    const body = document.getElementById('resultsBody');
+    const typeColors = {
+      preforeclosure: 'badge-red',
+      highequity: 'badge-green',
+      taxdelinquent: 'badge-gold',
+      absentee: 'badge-blue'
+    };
+    const typeLabels = {
+      preforeclosure: 'Pre-Foreclosure',
+      highequity: 'High Equity',
+      taxdelinquent: 'Tax Delinquent',
+      absentee: 'Absentee'
+    };
+
+    body.innerHTML = leads.map((l, i) => `
+      <tr>
+        <td style="color:var(--meta)">${i + 1}</td>
+        <td><span class="badge ${typeColors[l.type]}">${typeLabels[l.type]}</span></td>
+        <td style="font-weight:600">${l.owner}</td>
+        <td>${l.address}</td>
+        <td>${l.city}</td>
+        <td>${l.state}</td>
+        <td>${l.zip}</td>
+        <td>${l.estValue ? '$' + Number(l.estValue).toLocaleString() : '—'}</td>
+        <td>${l.equity !== null ? l.equity + '%' : '—'}</td>
+        <td>${l.beds}</td>
+        <td>${l.sqft !== '—' ? Number(l.sqft).toLocaleString() : '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  function renderEmpty(msg) {
+    document.getElementById('resultsBody').innerHTML = `
+      <tr><td colspan="11">
+        <div class="empty-state">
+          <div class="icon">⚠️</div>
+          <h3>${msg}</h3>
+          <p>Adjust your filters and try again</p>
+        </div>
+      </td></tr>`;
+  }
+
+  function updateStats(leads) {
+    document.getElementById('statTotal').textContent = leads.length;
+    const withPhone = leads.filter(l => l.phone && l.phone !== '—').length;
+    document.getElementById('statPhone').textContent = withPhone;
+
+    const values = leads.filter(l => l.estValue).map(l => l.estValue);
+    if (values.length) {
+      const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
+      document.getElementById('statValue').textContent = '$' + avg.toLocaleString();
+    } else {
+      document.getElementById('statValue').textContent = '—';
+    }
+
+    const equities = leads.filter(l => l.equity !== null).map(l => l.equity);
+    if (equities.length) {
+      const avg = Math.round(equities.reduce((a, b) => a + b, 0) / equities.length);
+      document.getElementById('statEquity').textContent = avg + '%';
+    } else {
+      document.getElementById('statEquity').textContent = '—';
+    }
+  }
+
+  function exportCSV() {
+    if (!pulledLeads.length) return;
+
+    const custName = document.getElementById('custName').value || 'customer';
+    const custPkg = document.getElementById('custPkg').value || 'leads';
+    const date = new Date().toISOString().slice(0, 10);
+
+    const headers = ['#', 'Lead Type', 'Owner Name', 'Address', 'City', 'State', 'Zip', 'Est Value', 'Equity %', 'Bedrooms', 'Sq Ft'];
+    const typeLabels = { preforeclosure: 'Pre-Foreclosure', highequity: 'High Equity', taxdelinquent: 'Tax Delinquent', absentee: 'Absentee Owner' };
+
+    const rows = pulledLeads.map((l, i) => [
+      i + 1,
+      typeLabels[l.type],
+      l.owner,
+      l.address,
+      l.city,
+      l.state,
+      l.zip,
+      l.estValue ? l.estValue : '',
+      l.equity !== null ? l.equity : '',
+      l.beds,
+      l.sqft !== '—' ? l.sqft : ''
+    ]);
+
+    const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `LeadPuller_${custName.replace(/\s+/g, '-')}_${date}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
+
+</body>
+</html>
