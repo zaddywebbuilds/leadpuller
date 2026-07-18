@@ -331,22 +331,8 @@
       params.set('state', state);
     }
 
-    // Use allevents for foreclosure/tax events, snapshot for property lists
-    let endpoint;
-    if (type === 'preforeclosure') {
-      endpoint = `${BASE}/allevents/detail`;
-      // Filter to foreclosure-related event categories (Lis Pendens / NOD)
-      params.set('starteventrecordingdate', '2024-01-01');
-      params.set('endeventrecordingdate', new Date().toISOString().slice(0, 10));
-    } else if (type === 'taxdelinquent') {
-      endpoint = `${BASE}/allevents/detail`;
-      params.set('starteventrecordingdate', '2023-01-01');
-      params.set('endeventrecordingdate', new Date().toISOString().slice(0, 10));
-    } else {
-      // highequity + absentee: pull property snapshot, filter client-side
-      endpoint = `${BASE}/property/snapshot`;
-      params.set('minestimatedvalue', '50000');
-    }
+    // Use /property/snapshot for all types — only pass location params ATTOM accepts
+    const endpoint = `${BASE}/property/snapshot`;
 
     const url = `${PROXY}${encodeURIComponent(`${endpoint}?${params.toString()}`)}`;
     const resp = await fetch(url, { headers });
