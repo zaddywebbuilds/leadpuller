@@ -347,29 +347,50 @@
     const props = data.property || data.event || [];
     if (!Array.isArray(props)) throw new Error('Unexpected API response shape. Keys: ' + Object.keys(data).join(', '));
 
+    // Log first record so we can inspect ATTOM's exact field structure
+    if (props[0]) console.log('ATTOM sample record:', JSON.stringify(props[0], null, 2));
+
     return props.slice(0, max).map(p => {
       const addr = p.address || {};
       const avm = p.avm || {};
       const assessment = p.assessment || {};
       const building = p.building || {};
       const owner = p.owner || {};
+      const summary = p.summary || {};
       const mort = p.mortgage || {};
 
-      const estValue = avm.amount?.value || assessment.market?.mktttlvalue || assessment.assessed?.assdttlvalue || null;
-      const loanBal = mort.amount || null;
+      // Try every known ATTOM owner name field
+      const ownerName =
+        owner.owner1?.fullname ||
+        owner.owner1?.corpname ||
+        owner.corporateName ||
+        summary.absenteeInd ||
+        addr.owner1full ||
+        addr.ownersfullname ||
+        '—';
+
+      const estValue =
+        avm.amount?.value ||
+        avm.estimatedvalue ||
+        assessment.market?.mktttlvalue ||
+        assessment.assessed?.assdttlvalue ||
+        null;
+
+      const loanBal = mort.amount || mort.firstmtgamt || null;
       const equity = estValue && loanBal ? Math.round(((estValue - loanBal) / estValue) * 100) : null;
 
       return {
         type: type,
-        owner: owner.owner1?.fullname || p.participant?.[0]?.fullname || '—',
+        owner: ownerName,
         address: addr.line1 || '—',
         city: addr.locality || '—',
         state: addr.countrySubd || state,
         zip: addr.postal1 || zip || '—',
         estValue: estValue,
         equity: equity,
-        beds: building.rooms?.beds || '—',
-        sqft: building.size?.universalsize || '—'
+        beds: building.rooms?.beds || building.bedrooms || '—',
+        sqft: building.size?.universalsize || building.grosssize || '—',
+        mailingAddr: owner.mailingaddressoneline || owner.absenteeOwnerAddress || ''
       };
     });
   }
