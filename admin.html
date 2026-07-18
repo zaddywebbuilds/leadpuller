@@ -331,8 +331,8 @@
       params.set('state', state);
     }
 
-    // Use /property/snapshot for all types — only pass location params ATTOM accepts
-    const endpoint = `${BASE}/property/snapshot`;
+    // /property/detail returns owner name, AVM value, mortgage — snapshot has none of these
+    const endpoint = `${BASE}/property/detail`;
 
     const url = `${PROXY}${encodeURIComponent(`${endpoint}?${params.toString()}`)}`;
     const resp = await fetch(url, { headers });
