@@ -320,7 +320,6 @@
 
   async function fetchLeads(type, state, zip, max) {
     const headers = { 'apikey': API_KEY, 'Accept': 'application/json' };
-    let endpoint = '';
     let params = new URLSearchParams();
 
     params.set('pagesize', String(Math.min(max, 100)));
@@ -332,20 +331,21 @@
       params.set('state', state);
     }
 
+    // Use allevents for foreclosure/tax events, snapshot for property lists
+    let endpoint;
     if (type === 'preforeclosure') {
       endpoint = `${BASE}/allevents/detail`;
-      params.set('eventtypeid', '59');  // Lis Pendens
-    } else if (type === 'highequity') {
-      endpoint = `${BASE}/property/snapshot`;
-      params.set('mineqpct', '40');
-      params.set('ownocc', '1');
+      // Filter to foreclosure-related event categories (Lis Pendens / NOD)
+      params.set('starteventrecordingdate', '2024-01-01');
+      params.set('endeventrecordingdate', new Date().toISOString().slice(0, 10));
     } else if (type === 'taxdelinquent') {
       endpoint = `${BASE}/allevents/detail`;
-      params.set('eventtypeid', '118'); // Tax Lien
-    } else if (type === 'absentee') {
+      params.set('starteventrecordingdate', '2023-01-01');
+      params.set('endeventrecordingdate', new Date().toISOString().slice(0, 10));
+    } else {
+      // highequity + absentee: pull property snapshot, filter client-side
       endpoint = `${BASE}/property/snapshot`;
-      params.set('ownocc', '0');
-      params.set('absentee', '1');
+      params.set('minestimatedvalue', '50000');
     }
 
     const url = `${PROXY}${encodeURIComponent(`${endpoint}?${params.toString()}`)}`;
@@ -353,31 +353,29 @@
 
     if (!resp.ok) {
       const text = await resp.text();
-      throw new Error(`ATTOM API ${resp.status}: ${text.slice(0, 200)}`);
+      throw new Error(`ATTOM API ${resp.status}: ${text.slice(0, 300)}`);
     }
 
     const data = await resp.json();
 
-    // Handle both property and event response shapes
     const props = data.property || data.event || [];
-    if (!Array.isArray(props)) throw new Error('Unexpected API response shape');
+    if (!Array.isArray(props)) throw new Error('Unexpected API response shape. Keys: ' + Object.keys(data).join(', '));
 
     return props.slice(0, max).map(p => {
       const addr = p.address || {};
       const avm = p.avm || {};
       const assessment = p.assessment || {};
-      const lot = p.lot || {};
       const building = p.building || {};
       const owner = p.owner || {};
       const mort = p.mortgage || {};
 
-      const estValue = avm.amount?.value || assessment.assessed?.assdttlvalue || null;
+      const estValue = avm.amount?.value || assessment.market?.mktttlvalue || assessment.assessed?.assdttlvalue || null;
       const loanBal = mort.amount || null;
       const equity = estValue && loanBal ? Math.round(((estValue - loanBal) / estValue) * 100) : null;
 
       return {
         type: type,
-        owner: owner.owner1?.fullname || addr.owner1full || '—',
+        owner: owner.owner1?.fullname || p.participant?.[0]?.fullname || '—',
         address: addr.line1 || '—',
         city: addr.locality || '—',
         state: addr.countrySubd || state,
